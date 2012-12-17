@@ -11,6 +11,8 @@ class Kernel(object):
 
 class SE(Kernel):
     def __call__(self, x, z=[]):
+        if x.shape[0] == 0:
+            return np.mat(np.zeros((0, 0)))
         sx = x*self.covd
         if z == []:
             K = ssd.squareform(ssd.pdist(sx, 'sqeuclidean'))
