@@ -4,8 +4,8 @@ import numpy as np
 class GP(object):
     def __init__(self, kernel, d=2):
         self.kernel = kernel
-        self.x = np.zeros((0, d))
-        self.y = np.zeros((0, 1))
+        self.x = np.mat(np.zeros((0, d)))
+        self.y = np.mat(np.zeros((0, 1)))
 
     def __len__(self):
         assert self.x.shape[0] == self.y.shape[0]

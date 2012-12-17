@@ -3,7 +3,7 @@ import numpy as np
 import plan.gp.gp
 
 
-class TestSequenceFunctions(unittest.TestCase):
+class GPTest(unittest.TestCase):
     def test_len(self):
         tmp = plan.gp.gp.GP(2)
         self.assertEqual(len(tmp), 0)
