@@ -1,12 +1,12 @@
-import numpy as np
+import numpy.matlib as np
 import numpy.linalg
 
 
 class GP(object):
     def __init__(self, kernel, d=2):
         self.kernel = kernel
-        self.x = np.mat(np.zeros((0, d)))
-        self.y = np.mat(np.zeros((0, 1)))
+        self.x = np.zeros((0, d))
+        self.y = np.zeros((0, 1))
         self._update()
 
     def __len__(self):
@@ -16,7 +16,7 @@ class GP(object):
     def _update(self):
         self.K = self.kernel(self.x)
         if self.K.shape[0] == 0:
-            self.L = np.mat(np.zeros((0, 0)))
+            self.L = np.zeros((0, 0))
         else:
             # FIXME: Needs better handling (depending on noise)
             eps = np.diagflat(0.01*np.ones((1, len(self))))
