@@ -17,28 +17,32 @@ class GP(object):
     def _update(self):
         self.K = self.kernel(self.x)
         if self.K.shape[0] == 0:
-            self.cho = np.zeros((0, 0))
+            self.L = np.zeros((0, 0))
         else:
             sn2 = np.exp(2*self.kernel.lik)
             self.K = self.K + sn2*np.eye(len(self))
-            self.cho = scipy.linalg.cho_factor(self.K)
+            self.L = scipy.linalg.cholesky(self.K, lower=True)
 
     def inf(self, x):
         x = np.asmatrix(x)
         assert x.shape[1] == self.d
         n = x.shape[0]
+        # Handle empy test set
         if n == 0:
             return (np.zeros((0, 1)), np.zeros((0, 1)))
+        # Handle empty training set
         ms = self.kernel.mean*np.ones((n, 1))
-        Kbb = self.kernel(x)#, diag=True)
+        Kbb = self.kernel(x, diag=True)
         if len(self) == 0:
             return (ms, np.asmatrix(np.diag(Kbb)).T)
         Kba = self.kernel(x, self.x)
         m = self.kernel.mean*np.ones((len(self), 1))
-        fm = ms + Kba*scipy.linalg.cho_solve(self.cho, self.y - m)
-        W = np.asmatrix(scipy.linalg.cho_solve(self.cho, Kba.T))
-        # FIXME: Make this faster (see GPML)
-        fv = np.asmatrix(np.diag(Kbb - Kba*W)).T
+        fm = ms + Kba*scipy.linalg.cho_solve((self.L, True), self.y - m,
+                                             overwrite_b=True)
+        W = scipy.linalg.cho_solve((self.L, True), Kba.T)
+        fv = np.asmatrix(Kbb - np.sum(np.multiply(Kba.T, W), axis=0).T)
+        #W = np.asmatrix(scipy.linalg.solve(self.L, Kba.T, lower=True))
+        #fv = np.asmatrix(Kbb - np.sum(np.power(W, 2), axis=0).T)
         return (fm, fv)
 
     def add(self, x, y, update=True):
