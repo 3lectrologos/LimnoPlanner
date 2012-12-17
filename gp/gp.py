@@ -24,16 +24,22 @@ class GP(object):
             self.cho = scipy.linalg.cho_factor(self.K)
 
     def inf(self, x):
+        x = np.asmatrix(x)
         assert x.shape[1] == self.d
         n = x.shape[0]
-        x = np.asmatrix(x)
-        # TODO: Handle x.shape[0] == 0 separately?
+        if n == 0:
+            return (np.zeros((0, 1)), np.zeros((0, 1)))
+        ms = self.kernel.mean*np.ones((n, 1))
+        Kbb = self.kernel(x)#, diag=True)
+        if len(self) == 0:
+            return (ms, np.asmatrix(np.diag(Kbb)).T)
         Kba = self.kernel(x, self.x)
         m = self.kernel.mean*np.ones((len(self), 1))
-        ms = self.kernel.mean*np.ones((n, 1))
         fm = ms + Kba*scipy.linalg.cho_solve(self.cho, self.y - m)
-        
-        return (fm, 0)
+        W = np.asmatrix(scipy.linalg.cho_solve(self.cho, Kba.T))
+        # FIXME: Make this faster (see GPML)
+        fv = np.asmatrix(np.diag(Kbb - Kba*W)).T
+        return (fm, fv)
 
     def add(self, x, y, update=True):
         assert x.shape[0] == y.shape[0]
@@ -54,3 +60,6 @@ class GP(object):
             self.y = np.delete(self.y, np.s_[-n:], 0)
         if update:
             self._update()
+
+    def clear(self):
+        self.remove(len(self))

@@ -111,5 +111,5 @@ def test():
 def test2():
     fn = '/home/alkis/gp/testcases/tc/tc_limnolog-00110714-093200_bgape_gp.mat'
     tc = Testcase.from_mat(fn)
-    tc.surf(150)
+    tc.surf(50)
     return tc
