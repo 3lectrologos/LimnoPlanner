@@ -1,6 +1,6 @@
 import numpy as np
-import infpy.gp.gaussian_process as igp
-import infpy.gp.kernel_short_names as kernels
+import gp.gp as gp
+import gp.kernels as kernels
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import mpl_toolkits.mplot3d
@@ -27,7 +27,8 @@ class Testcase(object):
                               max(self.data['x'][:,1]))
             xtrain = self.data['x']
             ytrain = self.data['y']
-        self.model = igp.GaussianProcess(xtrain, ytrain, kernel)
+        self.model = gp.GP(kernel)
+        self.model.add(xtrain, ytrain)
         self.name = name
         self.h = h
 
@@ -40,7 +41,8 @@ class Testcase(object):
         data['y'] = m['tc'][0][0][0][0][0][1].newbyteorder('=')
         h = m['tc'][0][0][1][0][0].newbyteorder('=')
         name = m['tc'][0][0][3][0]
-        k = kernels.SE([400, 3]) + kernels.Noise(1) # TODO: Read from file
+        hyp = {'mean': 2.4, 'cov': [6, 1, 0.7], 'lik': -0.7}
+        k = kernels.SE(hyp)
         tc = Testcase(k, data=data, h=h, name=name)
         return tc
 
@@ -54,7 +56,7 @@ class Testcase(object):
         if self.type == 'fun':
             y = self.fun.eval(x)
         else:
-            (y, _, _) = self.model.predict(x)
+            (y, _) = self.model.inf(x)
             y = np.array(y)
         y = y.reshape((ngrid, ngrid))
         return (x1, x2, y)
@@ -98,7 +100,8 @@ class Testcase(object):
 
 def test():
     import misc.funs.rosenbrock
-    k = kernels.SE([1, 1])
+    hyp = {'mean': 0, 'cov': [-1.5, -1.5, 5], 'lik': -1}
+    k = kernels.SE(hyp)
     tc = Testcase(k, fun=misc.funs.rosenbrock, h=-10.0)
     #tc.surf()
     #tc.plot()
@@ -108,5 +111,5 @@ def test():
 def test2():
     fn = '/home/alkis/gp/testcases/tc/tc_limnolog-00110714-093200_bgape_gp.mat'
     tc = Testcase.from_mat(fn)
-    tc.ploth()
+    tc.surf(150)
     return tc

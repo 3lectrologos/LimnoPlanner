@@ -5,7 +5,7 @@ class Kernel(object):
     def __init__(self, hyp):
         self.mean = hyp['mean']
         self.cov = np.exp(hyp['cov'][:-1])
-        self.covd = np.diagflat(1/self.cov)
+        self.covd = np.asmatrix(np.diagflat(1/self.cov))
         self.sf2 = np.exp(2*hyp['cov'][-1])
         self.lik = hyp['lik']
 
@@ -17,9 +17,9 @@ class SE(Kernel):
             return self.sf2*np.ones((x.shape[0], 1))
         sx = x*self.covd
         if z == []:
-            K = ssd.squareform(ssd.pdist(sx, 'sqeuclidean'))
+            K = np.asmatrix(ssd.squareform(ssd.pdist(sx, 'sqeuclidean')))
         else:
             sz = z*self.covd
-            K = ssd.cdist(sx, sz, 'sqeuclidean')
+            K = np.asmatrix(ssd.cdist(sx, sz, 'sqeuclidean'))
         K = self.sf2*np.exp(-K/2)
         return K
