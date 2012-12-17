@@ -21,10 +21,10 @@ class Testcase(object):
             self.type = 'data'
             self.data = data
             self.lim = {}
-            self.lim['x1'] = (min(self.data['x'][:,0]),
-                              max(self.data['x'][:,0]))
-            self.lim['x2'] = (min(self.data['x'][:,1]),
-                              max(self.data['x'][:,1]))
+            self.lim['x1'] = (np.amin(self.data['x'][:,0]),
+                              np.amax(self.data['x'][:,0]))
+            self.lim['x2'] = (np.amin(self.data['x'][:,1]),
+                              np.amax(self.data['x'][:,1]))
             xtrain = self.data['x']
             ytrain = self.data['y']
         self.model = gp.GP(kernel)
@@ -37,8 +37,8 @@ class Testcase(object):
         import scipy.io
         m = scipy.io.loadmat(fname, byte_order='native')
         data = {}
-        data['x'] = m['tc'][0][0][0][0][0][0].newbyteorder('=')
-        data['y'] = m['tc'][0][0][0][0][0][1].newbyteorder('=')
+        data['x'] = np.asmatrix(m['tc'][0][0][0][0][0][0].newbyteorder('='))
+        data['y'] = np.asmatrix(m['tc'][0][0][0][0][0][1].newbyteorder('='))
         h = m['tc'][0][0][1][0][0].newbyteorder('=')
         name = m['tc'][0][0][3][0]
         hyp = {'mean': 2.4, 'cov': [6, 1, 0.7], 'lik': -0.7}
@@ -56,8 +56,7 @@ class Testcase(object):
         if self.type == 'fun':
             y = self.fun.eval(x)
         else:
-            (y, _) = self.model.inf(x)
-            y = np.array(y)
+            y = self.model.inf(x, meanonly=True)
         y = y.reshape((ngrid, ngrid))
         return (x1, x2, y)
 
@@ -87,13 +86,15 @@ class Testcase(object):
         ax = fig.gca()
         (x1, x2, y) = self.grid(ngrid)
         if mode == 'all':
-            plt.contourf(x1, x2, y, 20, cmap=plt.cm.jet)
-            plt.contour(x1, x2, y, 20, colors='k', linestyles='solid')
+            plt.contourf(np.asarray(x1), np.asarray(x2), np.asarray(y),
+                         20, cmap=plt.cm.jet)
+            plt.contour(np.asarray(x1), np.asarray(x2), np.asarray(y),
+                        20, colors='k', linestyles='solid')
         elif mode == 'this':
-            plt.contourf(x1, x2, y, cmap=plt.cm.jet,
-                         levels=[-1000000.0, self.h, 1000000.0])
-            plt.contour(x1, x2, y, colors='k', linestyles='solid',
-                        levels=[self.h])
+            plt.contourf(np.asarray(x1), np.asarray(x2), np.asarray(y),
+                         cmap=plt.cm.jet, levels=[-1e10, self.h, 1e10])
+            plt.contour(np.asarray(x1), np.asarray(x2), np.asarray(y),
+                        colors='k', linestyles='solid', levels=[self.h])
         ax.set_xlabel('$x_1$')
         ax.set_ylabel('$x_2$')
         plt.show()

@@ -23,7 +23,7 @@ class GP(object):
             self.K = self.K + sn2*np.eye(len(self))
             self.L = scipy.linalg.cholesky(self.K, lower=True)
 
-    def inf(self, x):
+    def inf(self, x, meanonly=False):
         x = np.asmatrix(x)
         assert x.shape[1] == self.d
         n = x.shape[0]
@@ -39,11 +39,14 @@ class GP(object):
         m = self.kernel.mean*np.ones((len(self), 1))
         fm = ms + Kba*scipy.linalg.cho_solve((self.L, True), self.y - m,
                                              overwrite_b=True)
-        W = scipy.linalg.cho_solve((self.L, True), Kba.T)
-        fv = np.asmatrix(Kbb - np.sum(np.multiply(Kba.T, W), axis=0).T)
-        #W = np.asmatrix(scipy.linalg.solve(self.L, Kba.T, lower=True))
-        #fv = np.asmatrix(Kbb - np.sum(np.power(W, 2), axis=0).T)
-        return (fm, fv)
+        if meanonly:
+            return fm
+        else:
+            W = scipy.linalg.cho_solve((self.L, True), Kba.T)
+            fv = np.asmatrix(Kbb - np.sum(np.multiply(Kba.T, W), axis=0).T)
+            # W = np.asmatrix(scipy.linalg.solve(self.L, Kba.T, lower=True))
+            # fv = np.asmatrix(Kbb - np.sum(np.power(W, 2), axis=0).T)
+            return (fm, fv)
 
     def add(self, x, y, update=True):
         assert x.shape[0] == y.shape[0]
