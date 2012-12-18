@@ -66,9 +66,24 @@ class GPInfTest(unittest.TestCase):
         self.assertEqual((0, 1), fv.shape)
 
     def test_inf_notrain(self):
-        empty = self.gp.clear()
+        self.gp.clear()
         (fm, fv) = self.gp.inf(self.z)
         fmtrue = np.mat([1, 1]).T
         fvtrue = np.mat([7.389056, 7.389056]).T
         self.assertTrue(almostEqual(fmtrue, fm, 0.00001))
         self.assertTrue(almostEqual(fvtrue, fv, 0.00001))
+
+    def test_minfo(self):
+        mi = self.gp.minfo(self.z)
+        mitrue = 3.6591066
+        self.assertTrue(almostEqual(mitrue, mi, 0.00001))
+
+    def test_minfo_empty(self):
+        mi = self.gp.minfo(np.zeros((0, 2)))
+        self.assertTrue(almostEqual(0.0, mi, 1e-10))
+
+    def test_minfo_notrain(self):
+        self.gp.clear()
+        mi = self.gp.minfo(self.z)
+        mitrue = 3.8574835
+        self.assertTrue(almostEqual(mitrue, mi, 0.00001))

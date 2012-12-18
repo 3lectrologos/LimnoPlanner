@@ -1,5 +1,6 @@
 import numpy.matlib as np
 import scipy.linalg
+import numpy.linalg
 
 
 class GP(object):
@@ -23,31 +24,6 @@ class GP(object):
             self.K = self.K + sn2*np.eye(len(self))
             self.L = scipy.linalg.cholesky(self.K, lower=True)
 
-    def inf(self, x, meanonly=False):
-        x = np.asmatrix(x)
-        assert x.shape[1] == self.d
-        n = x.shape[0]
-        # Handle empy test set
-        if n == 0:
-            return (np.zeros((0, 1)), np.zeros((0, 1)))
-        # Handle empty training set
-        ms = self.kernel.mean*np.ones((n, 1))
-        Kbb = self.kernel(x, diag=True)
-        if len(self) == 0:
-            return (ms, np.asmatrix(np.diag(Kbb)).T)
-        Kba = self.kernel(x, self.x)
-        m = self.kernel.mean*np.ones((len(self), 1))
-        fm = ms + Kba*scipy.linalg.cho_solve((self.L, True), self.y - m,
-                                             overwrite_b=True)
-        if meanonly:
-            return fm
-        else:
-            W = scipy.linalg.cho_solve((self.L, True), Kba.T)
-            fv = np.asmatrix(Kbb - np.sum(np.multiply(Kba.T, W), axis=0).T)
-            # W = np.asmatrix(scipy.linalg.solve(self.L, Kba.T, lower=True))
-            # fv = np.asmatrix(Kbb - np.sum(np.power(W, 2), axis=0).T)
-            return (fm, fv)
-
     def add(self, x, y, update=True):
         assert x.shape[0] == y.shape[0]
         assert x.shape[1] == self.d
@@ -70,3 +46,46 @@ class GP(object):
 
     def clear(self):
         self.remove(len(self))
+
+    def inf(self, x, meanonly=False):
+        x = np.asmatrix(x)
+        assert x.shape[1] == self.d
+        n = x.shape[0]
+        # Handle empty test set
+        if n == 0:
+            return (np.zeros((0, 1)), np.zeros((0, 1)))
+        ms = self.kernel.mean*np.ones((n, 1))
+        Kbb = self.kernel(x, diag=True)
+        # Handle empty training set
+        if len(self) == 0:
+            return (ms, np.asmatrix(np.diag(Kbb)).T)
+        Kba = self.kernel(x, self.x)
+        m = self.kernel.mean*np.ones((len(self), 1))
+        fm = ms + Kba*scipy.linalg.cho_solve((self.L, True), self.y - m,
+                                             overwrite_b=True)
+        if meanonly:
+            return fm
+        else:
+            W = scipy.linalg.cho_solve((self.L, True), Kba.T)
+            fv = np.asmatrix(Kbb - np.sum(np.multiply(Kba.T, W), axis=0).T)
+            # W = np.asmatrix(scipy.linalg.solve(self.L, Kba.T, lower=True))
+            # fv = np.asmatrix(Kbb - np.sum(np.power(W, 2), axis=0).T)
+            return (fm, fv)
+
+    def minfo(self, x):
+        x = np.asmatrix(x)
+        assert x.shape[1] == self.d
+        n = x.shape[0]
+        # Handle empty test set
+        if n == 0:
+            return 0
+        Kbb = self.kernel(x)
+        # Handle empty training set
+        if len(self) == 0:
+            S = Kbb
+        else:
+            Kba = self.kernel(x, self.x)
+            S = Kbb - Kba*scipy.linalg.cho_solve((self.L, True), Kba.T)
+        sn2 = np.exp(2*self.kernel.lik)
+        (sng, mi) = numpy.linalg.slogdet(np.eye(n) + S/sn2)
+        return 0.5*mi
