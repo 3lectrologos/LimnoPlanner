@@ -1,9 +1,10 @@
-import numpy as np
+import numpy.matlib as np
 import gp.gp as gp
 import gp.kernels as kernels
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import mpl_toolkits.mplot3d
+import networkx as nx
 
 
 class Testcase(object):
@@ -49,7 +50,7 @@ class Testcase(object):
     def grid(self, ngrid=30):
         x1 = np.linspace(self.lim['x1'][0], self.lim['x1'][1], ngrid)
         x2 = np.linspace(self.lim['x2'][0], self.lim['x2'][1], ngrid)
-        x1, x2 = np.meshgrid(x1, x2)
+        (x1, x2) = np.meshgrid(x1, x2)
         x1r = x1.reshape((-1, 1));
         x2r = x2.reshape((-1, 1));
         x = np.concatenate((x1r, x2r), 1)
@@ -71,7 +72,7 @@ class Testcase(object):
         ax.set_xlabel('$x_1$')
         ax.set_ylabel('$x_2$')
         ax.set_zlabel('$y$')
-        plt.show()
+        #plt.show()
 
     def plot(self, ngrid=30):
         self.plot_aux('all', ngrid)
@@ -97,20 +98,61 @@ class Testcase(object):
                         colors='k', linestyles='solid', levels=[self.h])
         ax.set_xlabel('$x_1$')
         ax.set_ylabel('$x_2$')
-        plt.show()
+        #plt.show()
 
 def test():
     import misc.funs.rosenbrock
     hyp = {'mean': 0, 'cov': [-1.5, -1.5, 5], 'lik': -1}
     k = kernels.SE(hyp)
     tc = Testcase(k, fun=misc.funs.rosenbrock, h=-10.0)
-    #tc.surf()
-    #tc.plot()
-    tc.ploth()
     return tc
 
 def test2():
     fn = '/home/alkis/gp/testcases/tc/tc_limnolog-00110714-093200_bgape_gp.mat'
     tc = Testcase.from_mat(fn)
-    tc.surf(50)
     return tc
+
+def graph():
+    g = Graph.from_testcase(test2())
+    return g
+
+class Graph(nx.DiGraph):
+    def __init__(self, x, y, ar=7):
+        super(Graph, self).__init__()
+        self.resx = x.shape[0]
+        self.resy = x.shape[1]
+        n = 2*x.size - 2*self.resy
+        self.add_nodes_from(range(1, n+1))
+        x = np.vstack((x.reshape((-1, 1)), x[-2:0:-1].reshape((-1, 1))))
+        y = np.vstack((y.reshape((-1, 1)), y[-2:0:-1].reshape((-1, 1))))
+        self.pos = dict(zip(range(1, n+1),
+                            zip(x.T.tolist()[0], y.T.tolist()[0])))
+        for i in range(1, n+1):
+            for j in self.column(i):
+                dx = np.absolute(self.pos[j][0] - self.pos[i][0])
+                dy = np.absolute(self.pos[j][1] - self.pos[i][1])
+                if dy <= dx / ar:
+                    self.add_edge(i, j)
+    
+    def column(self, v, n=1):
+        assert v <= len(self)
+        thiscollast = v + self.resy - 1 - (v-1) % self.resy
+        fst = thiscollast + (n-1)*self.resy + 1
+        nextcol = range(fst, fst+self.resy)
+        return [1 + (nxt - 1) % len(self) for nxt in nextcol]
+
+    @classmethod
+    def from_testcase(cls, tc, resx=10, resy=20, ar=7):
+        x = np.linspace(tc.lim['x1'][0], tc.lim['x1'][1], resx)
+        y = np.linspace(tc.lim['x2'][0], tc.lim['x2'][1], resy)
+        (x, y) = np.meshgrid(x, y)
+        return Graph(x.T, y.T, ar)
+
+    def plot(self, edges=False):
+        nx.draw_networkx_nodes(self, pos=self.pos)
+        if edges:
+            nx.draw_networkx_edges(self, pos=self.pos, arrows=False)
+        #nx.draw_networkx_labels(self, pos=self.pos,
+        #                        font_color='0.95', font_size=11)
+        plt.draw()
+        #plt.show()
