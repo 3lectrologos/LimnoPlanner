@@ -16,17 +16,19 @@ def test():
     return p
 
 # Constants
+_PAUSE_ON = False
 _LT_COLOR = '#1F6E99'
 _UT_COLOR = '#F2A230'
 _VT_COLOR = '#DDDDDD'
 _CWP_COLOR = '#00DD00'
+_PATH_COLOR = '#C3D9C3'
 _XLIM_SLACK = 50
 _YLIM_SLACK = 1
-_NGRID = 100
+_NGRID = 200
 _BETA = 3
 
 class Planner(object):
-    def __init__(self, tc, rule='miu_best_rand_5', spe=10, nla=5):
+    def __init__(self, tc, rule='miu_dp', spe=10, nla=10):
         self.tc = tc
         self.rule = rule
         self.spe = spe
@@ -47,7 +49,6 @@ class Planner(object):
         self.cwp = 1
         self.path = []
         self.final = False
-        self.curnla = self.nla
         self.model.clear()
         self.ut = set(range(_NGRID*_NGRID))
         self.ht = set()
@@ -74,15 +75,21 @@ class Planner(object):
         x = np.vstack((xs, ys)).T
         return x[1:,:]
 
-    def eval_edge(self, e, mode='miu'):
+    def eval_edge(self, e, mode='miu', xout=False):
         x = self.sample_edge(e)
         if mode == 'mi':
-            return self.model.minfo(x)
+            if xout:
+                return (self.model.minfo(x), x)
+            else:
+                return self.model.minfo(x)
         elif mode == 'miu':
             (m, v) = self.model.inf(x)
             unclass = np.logical_and((m - _BETA * np.sqrt(v)).flat < self.tc.h,
                                      (m + _BETA * np.sqrt(v)).flat > self.tc.h)
-            return self.model.minfo(x[unclass])
+            if xout:
+                return (self.model.minfo(x[unclass,:]), x[unclass,:])
+            else:
+                return self.model.minfo(x[unclass,:])
             
         else:
             raise Exception('Invalid edge evaluation mode')
@@ -98,10 +105,28 @@ class Planner(object):
             (m, v) = self.model.inf(x)
             unclass = np.logical_and((m - _BETA * np.sqrt(v)).flat < self.tc.h,
                                      (m + _BETA * np.sqrt(v)).flat > self.tc.h)
-            return self.model.minfo(x[unclass])
+            return self.model.minfo(x[unclass,:])
         else:
             raise Exception('Invalid path evaluation mode')
 
+    def dp(self, v, n):
+        nodes = [[(v, 0, [v])]] # nodeid, score, path
+        for lvl in range(1, n+1):
+            nextcol = self.graph.column(nodes[-1][0][0])
+            nodes.append([])
+            for u in nextcol:
+                nodes[-1].append((u, None, None, None))
+        for lvl in range(1, n+1):
+            for (i, node) in enumerate(nodes[lvl]):
+                u = node[0]
+                sc = []
+                for pu, psc, ppath in nodes[lvl-1]:
+                    sc.append(self.eval_path(ppath + [u], 'miu'))
+                maxi = np.argmax(sc)
+                nodes[lvl][i] = (u, sc[maxi], nodes[lvl-1][maxi][2] + [u])
+        maxidx = max(xrange(len(nodes[-1])), key=lambda i: nodes[-1][i][1])
+        return nodes[-1][maxidx][2]
+        
     def get_path(self):
         if self.rule == 'rand_1':
             self.path = [self.cwp, random.choice(self.graph.column(self.cwp))]
@@ -117,12 +142,14 @@ class Planner(object):
             self.path = self.graph.rand_path(self.cwp)
         elif self.rule == 'miu_best_rand_5':
             maxsc = -1
-            for i in xrange(1000):
+            for i in xrange(100):
                 p = self.graph.rand_path(self.cwp)
                 sc = self.eval_path(p, 'miu')
                 if sc > maxsc:
                     maxsc = sc
                     self.path = p
+        elif self.rule == 'miu_dp':
+            self.path = self.dp(self.cwp, self.nla)
         else:
             raise Exception('Invalid planning rule')
 
@@ -151,9 +178,11 @@ class Planner(object):
             self.cwp = self.path[1]
             if self.graph.is_terminal(self.cwp):
                 self.np = self.np + 1
-            raw_input('')
+            if _PAUSE_ON:
+                raw_input('')
         self.plot()
-        raw_input('')
+        if _PAUSE_ON:
+            raw_input('')
 
     def rem(self, arg):
         self.torem.extend(arg)
@@ -181,7 +210,8 @@ class Planner(object):
         #            colors='k', linestyles='solid', levels=[-1, 0, 1])
         edgelist = zip(self.path[:-1], self.path[1:])
         nx.draw_networkx_edges(self.graph, self.graph.pos, edgelist=edgelist,
-                               arrows=False)
+                               arrows=False, edge_color=_PATH_COLOR,
+                               alpha=0.5, width=3)
         self.rem(plt.plot(self.vt[:,0], self.vt[:,1], 'o',
                           markerfacecolor=_VT_COLOR,
                           markeredgecolor=_VT_COLOR,
@@ -191,6 +221,6 @@ class Planner(object):
                           self.graph.pos[self.cwp][1], 'o',
                           markerfacecolor=_CWP_COLOR,
                           markeredgecolor='k',
-                          alpha=0.5,
-                          markersize=15))
+                          alpha=0.7,
+                          markersize=20))
         plt.draw()

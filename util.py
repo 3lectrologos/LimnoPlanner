@@ -165,7 +165,7 @@ class Graph(nx.DiGraph):
         return path
 
     @classmethod
-    def from_testcase(cls, tc, resx=10, resy=20, ar=7):
+    def from_testcase(cls, tc, resx=10, resy=15, ar=7):
         x = np.linspace(tc.lim['x1'][0], tc.lim['x1'][1], resx)
         y = np.linspace(tc.lim['x2'][0], tc.lim['x2'][1], resy)
         (x, y) = np.meshgrid(x, y)
