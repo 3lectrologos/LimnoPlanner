@@ -1,11 +1,31 @@
 import numpy.matlib as np
-import gp.gp as gp
+import gp.core as gp
 import gp.kernels as kernels
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import mpl_toolkits.mplot3d
 import networkx as nx
 
+
+# Constants
+GRAPH_NODE_SIZE = 30
+GRAPH_NODE_COLOR = '#434D54'
+
+def test():
+    import misc.funs.rosenbrock
+    hyp = {'mean': 0, 'cov': [-1.5, -1.5, 5], 'lik': -1}
+    k = kernels.SE(hyp)
+    tc = Testcase(k, fun=misc.funs.rosenbrock, h=-10.0)
+    return tc
+
+def test2():
+    fn = '/home/alkis/gp/testcases/tc/tc_limnolog-00110714-135138_bgape_gp.mat'
+    tc = Testcase.from_mat(fn)
+    return tc
+
+def graph():
+    g = Graph.from_testcase(test2())
+    return g
 
 class Testcase(object):
     def __init__(self, kernel, fun=None, data=None, h=0, name='untitled'):
@@ -42,10 +62,17 @@ class Testcase(object):
         data['y'] = np.asmatrix(m['tc'][0][0][0][0][0][1].newbyteorder('='))
         h = m['tc'][0][0][1][0][0].newbyteorder('=')
         name = m['tc'][0][0][3][0]
-        hyp = {'mean': 2.4, 'cov': [6, 1, 0.7], 'lik': -0.7}
+        hyp = {'mean': 2.4, 'cov': [5.5, 1, 0.75], 'lik': -1}
         k = kernels.SE(hyp)
         tc = Testcase(k, data=data, h=h, name=name)
         return tc
+
+    def sample(self, x):
+        if self.type == 'fun':
+            y = self.fun.eval(x)
+        else:
+            y = self.model.sample(x)
+        return y
 
     def grid(self, ngrid=30):
         x1 = np.linspace(self.lim['x1'][0], self.lim['x1'][1], ngrid)
@@ -57,7 +84,7 @@ class Testcase(object):
         if self.type == 'fun':
             y = self.fun.eval(x)
         else:
-            y = self.model.inf(x, meanonly=True)
+            y = self.model.sample(x)
         y = y.reshape((ngrid, ngrid))
         return (x1, x2, y)
 
@@ -72,7 +99,7 @@ class Testcase(object):
         ax.set_xlabel('$x_1$')
         ax.set_ylabel('$x_2$')
         ax.set_zlabel('$y$')
-        #plt.show()
+        plt.show()
 
     def plot(self, ngrid=30):
         self.plot_aux('all', ngrid)
@@ -98,23 +125,7 @@ class Testcase(object):
                         colors='k', linestyles='solid', levels=[self.h])
         ax.set_xlabel('$x_1$')
         ax.set_ylabel('$x_2$')
-        #plt.show()
-
-def test():
-    import misc.funs.rosenbrock
-    hyp = {'mean': 0, 'cov': [-1.5, -1.5, 5], 'lik': -1}
-    k = kernels.SE(hyp)
-    tc = Testcase(k, fun=misc.funs.rosenbrock, h=-10.0)
-    return tc
-
-def test2():
-    fn = '/home/alkis/gp/testcases/tc/tc_limnolog-00110714-093200_bgape_gp.mat'
-    tc = Testcase.from_mat(fn)
-    return tc
-
-def graph():
-    g = Graph.from_testcase(test2())
-    return g
+        plt.show()
 
 class Graph(nx.DiGraph):
     def __init__(self, x, y, ar=7):
@@ -141,6 +152,9 @@ class Graph(nx.DiGraph):
         nextcol = range(fst, fst+self.resy)
         return [1 + (nxt - 1) % len(self) for nxt in nextcol]
 
+    def is_terminal(self, v):
+        return v in self.column(1, 0) or v in self.column(1, self.resx-1)
+
     @classmethod
     def from_testcase(cls, tc, resx=10, resy=20, ar=7):
         x = np.linspace(tc.lim['x1'][0], tc.lim['x1'][1], resx)
@@ -148,11 +162,13 @@ class Graph(nx.DiGraph):
         (x, y) = np.meshgrid(x, y)
         return Graph(x.T, y.T, ar)
 
-    def plot(self, edges=False):
-        nx.draw_networkx_nodes(self, pos=self.pos)
+    def plot(self, edges=False, show=False):
+        nx.draw_networkx_nodes(self, pos=self.pos, node_size=GRAPH_NODE_SIZE,
+                               node_color=GRAPH_NODE_COLOR)
         if edges:
             nx.draw_networkx_edges(self, pos=self.pos, arrows=False)
         #nx.draw_networkx_labels(self, pos=self.pos,
         #                        font_color='0.95', font_size=11)
         plt.draw()
-        #plt.show()
+        if show:
+            plt.show()

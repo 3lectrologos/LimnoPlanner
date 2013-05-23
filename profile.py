@@ -1,3 +1,6 @@
-import util
+#! /usr/bin/env python
 
-util.test2()
+import plan
+
+p = plan.test()
+p.run(4)
