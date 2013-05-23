@@ -75,22 +75,15 @@ class Planner(object):
         x = np.vstack((xs, ys)).T
         return x[1:,:]
 
-    def eval_edge(self, e, mode='miu', xout=False):
+    def eval_edge(self, e, mode='miu'):
         x = self.sample_edge(e)
         if mode == 'mi':
-            if xout:
-                return (self.model.minfo(x), x)
-            else:
-                return self.model.minfo(x)
+            return self.model.minfo(x)
         elif mode == 'miu':
             (m, v) = self.model.inf(x)
             unclass = np.logical_and((m - _BETA * np.sqrt(v)).flat < self.tc.h,
                                      (m + _BETA * np.sqrt(v)).flat > self.tc.h)
-            if xout:
-                return (self.model.minfo(x[unclass,:]), x[unclass,:])
-            else:
-                return self.model.minfo(x[unclass,:])
-            
+            return self.model.minfo(x[unclass,:])
         else:
             raise Exception('Invalid edge evaluation mode')
 
