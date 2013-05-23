@@ -9,8 +9,8 @@ import networkx as nx
 
 
 # Constants
-GRAPH_NODE_SIZE = 30
-GRAPH_NODE_COLOR = '#434D54'
+_GRAPH_NODE_SIZE = 30
+_GRAPH_NODE_COLOR = '#434D54'
 
 def test():
     import misc.funs.rosenbrock
@@ -175,8 +175,8 @@ class Graph(nx.DiGraph):
         return Graph(x.T, y.T, ar)
 
     def plot(self, edges=False, show=False):
-        nx.draw_networkx_nodes(self, pos=self.pos, node_size=GRAPH_NODE_SIZE,
-                               node_color=GRAPH_NODE_COLOR)
+        nx.draw_networkx_nodes(self, pos=self.pos, node_size=_GRAPH_NODE_SIZE,
+                               node_color=_GRAPH_NODE_COLOR)
         if edges:
             nx.draw_networkx_edges(self, pos=self.pos, arrows=False)
         #nx.draw_networkx_labels(self, pos=self.pos,
