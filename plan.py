@@ -112,7 +112,7 @@ class Planner(object):
     def dp(self, v, n):
         nodes = [[(v, 0, [v])]] # nodeid, score, path
         for lvl in range(1, n+1):
-            nextcol = self.graph.column(nodes[-1][0][0])
+            nextcol = self.graph.pcolumn(nodes[-1][0][0])
             nodes.append([])
             for u in nextcol:
                 nodes[-1].append((u, None, None, None))
@@ -129,13 +129,13 @@ class Planner(object):
         
     def get_path(self):
         if self.rule == 'rand_1':
-            self.path = [self.cwp, random.choice(self.graph.column(self.cwp))]
+            self.path = [self.cwp, random.choice(self.graph.pcolumn(self.cwp))]
         elif self.rule == 'mi_1':
-            col = self.graph.column(self.cwp)
+            col = self.graph.pcolumn(self.cwp)
             idx = np.argmax([self.eval_edge((self.cwp, v), 'mi') for v in col])
             self.path = [self.cwp, col[idx]]
         elif self.rule == 'miu_1':
-            col = self.graph.column(self.cwp)
+            col = self.graph.pcolumn(self.cwp)
             idx = np.argmax([self.eval_edge((self.cwp, v), 'miu') for v in col])
             self.path = [self.cwp, col[idx]]
         elif self.rule == 'rand_5':

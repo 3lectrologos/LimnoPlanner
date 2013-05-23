@@ -146,6 +146,9 @@ class Graph(nx.DiGraph):
                 if dy <= dx / ar:
                     self.add_edge(i, j)
     
+    def pcolumn(self, v, n=1):
+        return [u for u in self.column(v, n) if self.has_edge(v, u)]
+                    
     def column(self, v, n=1):
         assert v <= len(self)
         thiscollast = v + self.resy - 1 - (v-1) % self.resy
@@ -165,7 +168,7 @@ class Graph(nx.DiGraph):
         return path
 
     @classmethod
-    def from_testcase(cls, tc, resx=10, resy=15, ar=7):
+    def from_testcase(cls, tc, resx=15, resy=15, ar=7):
         x = np.linspace(tc.lim['x1'][0], tc.lim['x1'][1], resx)
         y = np.linspace(tc.lim['x2'][0], tc.lim['x2'][1], resy)
         (x, y) = np.meshgrid(x, y)
