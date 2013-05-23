@@ -25,9 +25,22 @@ class GP(object):
             self.L = scipy.linalg.cholesky(self.K, lower=True)
 
     def add(self, x, y, update=True):
-        assert x.shape[0] == y.shape[0]
-        assert x.shape[1] == self.d
-        assert y.shape[1] == 1
+        x = np.asmatrix(x)
+        y = np.asmatrix(y)
+        if x.shape[1] != self.d:
+            if x.shape[0] == self.d:
+                x = x.T
+            else:
+                raise Exception('Invalid train-set (x) dimension -- '
+                                'expected d = ' + str(self.d) + '.')
+        if y.shape[1] != 1:
+            if y.shape[0] == 1:
+                y = y.T
+            else:
+                raise Exception('Invalid train-set (y) dimension -- '
+                                'expected d = 1.')
+        if y.shape[0] != x.shape[0]:
+            raise Exception('Incompatible train-set (x, y) lengths.')
         x = np.asmatrix(x)
         y = np.asmatrix(y)
         if x.shape[0] > 0:
@@ -49,7 +62,12 @@ class GP(object):
 
     def inf(self, x, meanonly=False):
         x = np.asmatrix(x)
-        assert x.shape[1] == self.d
+        if x.shape[1] != self.d:
+            if x.shape[0] == self.d:
+                x = x.T
+            else:
+                raise Exception('Invalid test-set dimension -- '
+                                'expected d = ' + str(self.d) + '.')
         n = x.shape[0]
         # Handle empty test set
         if n == 0:
@@ -58,7 +76,7 @@ class GP(object):
         Kbb = self.kernel(x, diag=True)
         # Handle empty training set
         if len(self) == 0:
-            return (ms, np.asmatrix(np.diag(Kbb)).T)
+            return (ms, np.asmatrix(Kbb))
         Kba = self.kernel(x, self.x)
         m = self.kernel.mean*np.ones((len(self), 1))
         fm = ms + Kba*scipy.linalg.cho_solve((self.L, True), self.y - m,
@@ -71,6 +89,10 @@ class GP(object):
             # W = np.asmatrix(scipy.linalg.solve(self.L, Kba.T, lower=True))
             # fv = np.asmatrix(Kbb - np.sum(np.power(W, 2), axis=0).T)
             return (fm, fv)
+
+    def sample(self, x):
+        m = self.inf(x, meanonly=True)
+        return m + np.exp(self.kernel.lik) * np.randn(m.shape)
 
     def minfo(self, x):
         x = np.asmatrix(x)
