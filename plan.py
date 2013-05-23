@@ -26,7 +26,7 @@ _NGRID = 100
 _BETA = 3
 
 class Planner(object):
-    def __init__(self, tc, rule='miu_1', spe=10, nla=5):
+    def __init__(self, tc, rule='miu_best_rand_5', spe=10, nla=5):
         self.tc = tc
         self.rule = rule
         self.spe = spe
@@ -75,11 +75,10 @@ class Planner(object):
         return x[1:,:]
 
     def eval_edge(self, e, mode='miu'):
+        x = self.sample_edge(e)
         if mode == 'mi':
-            x = self.sample_edge(e)
             return self.model.minfo(x)
         elif mode == 'miu':
-            x = self.sample_edge(e)
             (m, v) = self.model.inf(x)
             unclass = np.logical_and((m - _BETA * np.sqrt(v)).flat < self.tc.h,
                                      (m + _BETA * np.sqrt(v)).flat > self.tc.h)
@@ -87,6 +86,21 @@ class Planner(object):
             
         else:
             raise Exception('Invalid edge evaluation mode')
+
+    def eval_path(self, p, mode='miu'):
+        x = np.zeros((0, 2))
+        edges = zip(p[:-1], p[1:])
+        for e in edges:
+            x = np.vstack((x, self.sample_edge(e)))
+        if mode == 'mi':
+            return self.model.minfo(x)
+        elif mode == 'miu':
+            (m, v) = self.model.inf(x)
+            unclass = np.logical_and((m - _BETA * np.sqrt(v)).flat < self.tc.h,
+                                     (m + _BETA * np.sqrt(v)).flat > self.tc.h)
+            return self.model.minfo(x[unclass])
+        else:
+            raise Exception('Invalid path evaluation mode')
 
     def get_path(self):
         if self.rule == 'rand_1':
@@ -99,6 +113,16 @@ class Planner(object):
             col = self.graph.column(self.cwp)
             idx = np.argmax([self.eval_edge((self.cwp, v), 'miu') for v in col])
             self.path = [self.cwp, col[idx]]
+        elif self.rule == 'rand_5':
+            self.path = self.graph.rand_path(self.cwp)
+        elif self.rule == 'miu_best_rand_5':
+            maxsc = -1
+            for i in xrange(1000):
+                p = self.graph.rand_path(self.cwp)
+                sc = self.eval_path(p, 'miu')
+                if sc > maxsc:
+                    maxsc = sc
+                    self.path = p
         else:
             raise Exception('Invalid planning rule')
 

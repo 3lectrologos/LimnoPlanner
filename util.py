@@ -1,3 +1,4 @@
+import random
 import numpy.matlib as np
 import gp.core as gp
 import gp.kernels as kernels
@@ -154,6 +155,14 @@ class Graph(nx.DiGraph):
 
     def is_terminal(self, v):
         return v in self.column(1, 0) or v in self.column(1, self.resx-1)
+
+    def rand_path(self, v, n=5):
+        node = v
+        path = [v]
+        for i in range(n):
+            node = random.choice(self.column(node))
+            path.append(node)
+        return path
 
     @classmethod
     def from_testcase(cls, tc, resx=10, resy=20, ar=7):
