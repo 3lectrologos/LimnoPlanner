@@ -11,6 +11,11 @@ import networkx as nx
 # Constants
 _GRAPH_NODE_SIZE = 30
 _GRAPH_NODE_COLOR = '#434D54'
+_GRAPH_XRES = 15
+_GRAPH_YRES_BASIC = 7
+_GRAPH_YRES_MLP = 100 / _GRAPH_YRES_BASIC
+_GRAPH_YRES_EXTRA = 7
+_GRAPH_ASPECT_RATIO = 7
 
 def test():
     import misc.funs.rosenbrock
@@ -129,35 +134,63 @@ class Testcase(object):
         plt.show()
 
 class Graph(nx.DiGraph):
-    def __init__(self, x, y, ar=7):
+    def __init__(self, x1, x2, fclass=None):
         super(Graph, self).__init__()
-        self.resx = x.shape[0]
-        self.resy = x.shape[1]
-        n = 2*x.size - 2*self.resy
+        self.yres = x1.shape[1]
+        self.fclass = fclass
+        n = 2*x1.size - 2*self.yres
         self.add_nodes_from(range(1, n+1))
-        x = np.vstack((x.reshape((-1, 1)), x[-2:0:-1].reshape((-1, 1))))
-        y = np.vstack((y.reshape((-1, 1)), y[-2:0:-1].reshape((-1, 1))))
+        x1 = np.vstack((x1.reshape((-1, 1)), x1[-2:0:-1].reshape((-1, 1))))
+        x2 = np.vstack((x2.reshape((-1, 1)), x2[-2:0:-1].reshape((-1, 1))))
+        self.x = np.hstack((x1, x2))
         self.pos = dict(zip(range(1, n+1),
-                            zip(x.T.tolist()[0], y.T.tolist()[0])))
+                            zip(x1.T.tolist()[0], x2.T.tolist()[0])))
+        self.full = nx.DiGraph(self)
         for i in range(1, n+1):
             for j in self.column(i):
-                dx = np.absolute(self.pos[j][0] - self.pos[i][0])
-                dy = np.absolute(self.pos[j][1] - self.pos[i][1])
-                if dy <= dx / ar:
-                    self.add_edge(i, j)
+                dx1 = np.absolute(self.pos[j][0] - self.pos[i][0])
+                dx2 = np.absolute(self.pos[j][1] - self.pos[i][1])
+                if dx2 <= dx1 / _GRAPH_ASPECT_RATIO:
+                    self.full.add_edge(i, j)
+        tmp = 1
+        self.basic = set()
+        step = self.yres/_GRAPH_YRES_BASIC
+        while tmp < n+1:
+            self.basic = self.basic | set(self.column(tmp)[0::step])
+            tmp = tmp + self.yres
+        self.update_active()
+
+    def update_active(self, inc=[]):
+        self.active = self.basic | set(inc)
+        if self.fclass:
+            unclass = set(self.fclass(self.x)) - self.active
+            tmp = 1
+            step = self.yres/_GRAPH_YRES_BASIC
+            while tmp <= self.number_of_nodes():
+                cand = set(self.column(tmp)) & unclass
+                chosen = random.sample(cand, min(_GRAPH_YRES_EXTRA, len(cand)))
+                self.active = self.active | set(chosen)
+                tmp = tmp + self.yres
+        self.remove_edges_from(self.edges())
+        for u, v in self.full.edges():
+            if u in self.active and v in self.active:
+                self.add_edge(u, v)
+
+    def init_node(self):
+        return 1
     
     def pcolumn(self, v, n=1):
         return [u for u in self.column(v, n) if self.has_edge(v, u)]
                     
     def column(self, v, n=1):
         assert v <= len(self)
-        thiscollast = v + self.resy - 1 - (v-1) % self.resy
-        fst = thiscollast + (n-1)*self.resy + 1
-        nextcol = range(fst, fst+self.resy)
+        last = v + self.yres - 1 - (v-1) % self.yres
+        fst = last + (n-1)*self.yres + 1
+        nextcol = range(fst, fst+self.yres)
         return [1 + (nxt - 1) % len(self) for nxt in nextcol]
 
     def is_terminal(self, v):
-        return v in self.column(1, 0) or v in self.column(1, self.resx-1)
+        return v in self.column(1, 0) or v in self.column(1, _GRAPH_XRES-1)
 
     def rand_path(self, v, n=5):
         node = v
@@ -168,19 +201,21 @@ class Graph(nx.DiGraph):
         return path
 
     @classmethod
-    def from_testcase(cls, tc, resx=15, resy=15, ar=7):
-        x = np.linspace(tc.lim['x1'][0], tc.lim['x1'][1], resx)
-        y = np.linspace(tc.lim['x2'][0], tc.lim['x2'][1], resy)
+    def from_testcase(cls, tc, fclass=None):
+        yres = _GRAPH_YRES_MLP*_GRAPH_YRES_BASIC + 1
+        x = np.linspace(tc.lim['x1'][0], tc.lim['x1'][1], _GRAPH_XRES)
+        y = np.linspace(tc.lim['x2'][0], tc.lim['x2'][1], yres)
         (x, y) = np.meshgrid(x, y)
-        return Graph(x.T, y.T, ar)
+        return Graph(x.T, y.T, fclass)
 
     def plot(self, edges=False, show=False):
-        nx.draw_networkx_nodes(self, pos=self.pos, node_size=_GRAPH_NODE_SIZE,
-                               node_color=_GRAPH_NODE_COLOR)
+        rn = nx.draw_networkx_nodes(self, nodelist=self.active,
+                                    pos=self.pos, node_size=_GRAPH_NODE_SIZE,
+                                    node_color=_GRAPH_NODE_COLOR)
         if edges:
-            nx.draw_networkx_edges(self, pos=self.pos, arrows=False)
-        #nx.draw_networkx_labels(self, pos=self.pos,
-        #                        font_color='0.95', font_size=11)
-        plt.draw()
+            re = nx.draw_networkx_edges(self, pos=self.pos, arrows=False)
+            return (rn, re)
+        else:
+            return rn
         if show:
             plt.show()

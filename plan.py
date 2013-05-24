@@ -33,11 +33,17 @@ class Planner(object):
         self.rule = rule
         self.spe = spe
         self.nla = nla
-        self.graph = util.Graph.from_testcase(tc)
         (self.gx1, self.gx2, _) = tc.grid(_NGRID)
         self.gfx = np.hstack((self.gx1.reshape(-1, 1), self.gx2.reshape(-1, 1)))
         self.init_model()
+        self.graph = util.Graph.from_testcase(tc, self.fclass)
         self.reset()
+
+    def fclass(self, x):
+        (m, v) = self.model.inf(x)
+        unclass = np.logical_and((m - _BETA * np.sqrt(v)).flat < self.tc.h,
+                                 (m + _BETA * np.sqrt(v)).flat > self.tc.h)
+        return list(np.arange(1, len(unclass)+1)[unclass])
 
     def init_model(self):
         hyp = {'mean': 2.4, 'cov': [5.5, 1, 0.75], 'lik': -1}
@@ -46,7 +52,7 @@ class Planner(object):
 
     def reset(self):
         self.np = 0
-        self.cwp = 1
+        self.cwp = self.graph.init_node()
         self.path = []
         self.final = False
         self.model.clear()
@@ -56,7 +62,6 @@ class Planner(object):
         self.vt = np.zeros((0, 2))
         self.torem = []
         plt.figure()
-        self.graph.plot()
         plt.xlim(self.tc.lim['x1'][0]-_XLIM_SLACK,
                  self.tc.lim['x1'][1]+_XLIM_SLACK)
         plt.ylim(self.tc.lim['x2'][0]-_YLIM_SLACK,
@@ -169,6 +174,7 @@ class Planner(object):
             self.classify()
             self.vt = np.vstack((self.vt, x))
             self.cwp = self.path[1]
+            self.graph.update_active([self.cwp])
             if self.graph.is_terminal(self.cwp):
                 self.np = self.np + 1
             if _PAUSE_ON:
@@ -178,7 +184,10 @@ class Planner(object):
             raw_input('')
 
     def rem(self, arg):
-        self.torem.extend(arg)
+        if type(arg) == list:
+            self.torem.extend(arg)
+        else:
+            self.torem.append(arg)
 
     def remplt(self):
         [arg.remove() for arg in self.torem]
@@ -186,6 +195,7 @@ class Planner(object):
         
     def plot(self):
         self.remplt()
+        self.rem(self.graph.plot())
         mpl.rc('text', usetex=True)
         mpl.rc('font', family='serif')
         y = np.zeros((_NGRID, _NGRID))
@@ -199,8 +209,6 @@ class Planner(object):
         plt.contourf(np.asarray(self.gx1), np.asarray(self.gx2),
                      np.asarray(y), cmap=cmap, extend='both',
                      levels=[-0.0001, 0])
-        #plt.contour(np.asarray(self.gx1), np.asarray(self.gx2), np.asarray(y),
-        #            colors='k', linestyles='solid', levels=[-1, 0, 1])
         edgelist = zip(self.path[:-1], self.path[1:])
         nx.draw_networkx_edges(self.graph, self.graph.pos, edgelist=edgelist,
                                arrows=False, edge_color=_PATH_COLOR,
