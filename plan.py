@@ -1,7 +1,7 @@
 import util
 import random
 import copy
-import pickle
+import cPickle
 import copy_reg
 import types
 import curses
@@ -14,7 +14,7 @@ import matplotlib as mpl
 import mpl_toolkits.mplot3d
 
 # Constants
-_PAUSE_ON = True
+_PAUSE_ON = False
 _LT_COLOR = '#1F6E99'
 _UT_COLOR = '#F2A230'
 _VT_COLOR = '#DDDDDD'
@@ -26,8 +26,8 @@ _NGRID = 200
 _BETA = 3
 
 
-# Pickle methods by name (used to circumvent problem with pickling of
-# instance methods)
+# Pickle methods by name (used to circumvent problem
+# with pickling of instance methods)
 def reduce_method(m):
     return (getattr, (m.__self__, m.__func__.__name__))
 
@@ -246,7 +246,7 @@ class Recorder(object):
     @classmethod
     def from_file(cls, filepath):
         with open(filepath, 'r') as f:
-            return pickle.load(f)
+            return cPickle.load(f)
 
     def record(self, obj):
         self.path.append(obj.path)
@@ -292,4 +292,4 @@ class Recorder(object):
         if not fpath:
             fpath = 'log'
         with open(fpath, 'w') as f:
-            pickle.dump(self, f)
+            cPickle.dump(self, f)
