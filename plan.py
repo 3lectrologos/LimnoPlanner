@@ -1,5 +1,10 @@
 import util
 import random
+import copy
+import pickle
+import copy_reg
+import types
+import curses
 import numpy as np
 import gp.core as gp
 import gp.kernels as kernels
@@ -8,15 +13,8 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import mpl_toolkits.mplot3d
 
-
-def test():
-    import util
-    tc = util.test2()
-    p = Planner(tc)
-    return p
-
 # Constants
-_PAUSE_ON = False
+_PAUSE_ON = True
 _LT_COLOR = '#1F6E99'
 _UT_COLOR = '#F2A230'
 _VT_COLOR = '#DDDDDD'
@@ -26,6 +24,14 @@ _XLIM_SLACK = 50
 _YLIM_SLACK = 1
 _NGRID = 200
 _BETA = 3
+
+
+# Pickle methods by name (used to circumvent problem with pickling of
+# instance methods)
+def reduce_method(m):
+    return (getattr, (m.__self__, m.__func__.__name__))
+
+copy_reg.pickle(types.MethodType, reduce_method)
 
 class Planner(object):
     def __init__(self, tc, rule='miu_dp', spe=10, nla=10):
@@ -51,23 +57,14 @@ class Planner(object):
         self.model = gp.GP(kernel)
 
     def reset(self):
-        self.np = 0
         self.cwp = self.graph.init_node()
+        self.fullpath = [self.cwp]
         self.path = []
         self.final = False
         self.model.clear()
         self.ut = set(range(_NGRID*_NGRID))
         self.ht = set()
         self.lt = set()
-        self.vt = np.zeros((0, 2))
-        self.torem = []
-        plt.figure()
-        plt.xlim(self.tc.lim['x1'][0]-_XLIM_SLACK,
-                 self.tc.lim['x1'][1]+_XLIM_SLACK)
-        plt.ylim(self.tc.lim['x2'][0]-_YLIM_SLACK,
-                 self.tc.lim['x2'][1]+_YLIM_SLACK)
-        plt.xlabel('$x_1$')
-        plt.ylabel('$x_2$')
 
     def sample_edge(self, e):
         (v1, v2) = e
@@ -147,13 +144,10 @@ class Planner(object):
                     maxsc = sc
                     self.path = p
         elif self.rule == 'miu_dp':
-            self.path = self.dp(self.cwp, self.nla)
+            self.path = self.dp(self.cwp, self.curnla)
         else:
             raise Exception('Invalid planning rule')
 
-    def check_final(self):
-        pass
-    
     def classify(self):
         (m, v) = self.model.inf(self.gfx)
         n = _NGRID*_NGRID
@@ -161,43 +155,59 @@ class Planner(object):
         self.lt = set(np.arange(n)[(m + _BETA * np.sqrt(v)).flat < self.tc.h])
         self.ut = set(np.arange(n)) - self.ht - self.lt
 
-    def run(self, npasses=2):
+    def run(self, npasses=2, record=False, recfilepath=None):
+        if record:
+            rec = Recorder(self)
         plt.ion()
         self.reset()
-        while self.np < npasses:
+        self.curnla = min(self.nla, npasses*(self.graph.xres-1))
+        np = 0
+        while np < npasses:
+            self.graph.update_active([self.cwp])
             self.get_path()
             self.plot()
-            self.check_final()
+            if record:
+                rec.record(self)
+            if _PAUSE_ON:
+                raw_input('')
             x = self.sample_edge((self.cwp, self.path[1]))
             y = self.tc.sample(x)
             self.model.add(x, y)
             self.classify()
-            self.vt = np.vstack((self.vt, x))
             self.cwp = self.path[1]
-            self.graph.update_active([self.cwp])
+            self.fullpath.append(self.cwp)
+            # Check for final pass
+            if self.graph.is_terminal(self.path[-1]):
+                term = [i for (i, p) in enumerate(self.path[1:]) if
+                        self.graph.is_terminal(p)]
+                if len(term) == npasses - np:
+                    self.final = True
+            if self.final:
+                self.curnla = self.curnla - 1
             if self.graph.is_terminal(self.cwp):
-                self.np = self.np + 1
-            if _PAUSE_ON:
-                raw_input('')
+                np = np + 1
+        self.path = [self.cwp]
         self.plot()
+        if record:
+            rec.record(self)
+            rec.end(self)
+            rec.save(recfilepath)
         if _PAUSE_ON:
             raw_input('')
+        if record:
+            return rec
 
-    def rem(self, arg):
-        if type(arg) == list:
-            self.torem.extend(arg)
-        else:
-            self.torem.append(arg)
-
-    def remplt(self):
-        [arg.remove() for arg in self.torem]
-        self.torem = []
-        
     def plot(self):
-        self.remplt()
-        self.rem(self.graph.plot())
+        plt.clf()
         mpl.rc('text', usetex=True)
         mpl.rc('font', family='serif')
+        plt.xlim(self.tc.lim['x1'][0]-_XLIM_SLACK,
+                 self.tc.lim['x1'][1]+_XLIM_SLACK)
+        plt.ylim(self.tc.lim['x2'][0]-_YLIM_SLACK,
+                 self.tc.lim['x2'][1]+_YLIM_SLACK)
+        plt.xlabel('$x_1$')
+        plt.ylabel('$x_2$')
+        self.graph.plot()
         y = np.zeros((_NGRID, _NGRID))
         if self.ht:
             y[np.unravel_index(list(self.ht), y.shape)] = 1
@@ -213,15 +223,73 @@ class Planner(object):
         nx.draw_networkx_edges(self.graph, self.graph.pos, edgelist=edgelist,
                                arrows=False, edge_color=_PATH_COLOR,
                                alpha=0.5, width=3)
-        self.rem(plt.plot(self.vt[:,0], self.vt[:,1], 'o',
-                          markerfacecolor=_VT_COLOR,
-                          markeredgecolor=_VT_COLOR,
-                          alpha=0.5,
-                          markersize=3))
-        self.rem(plt.plot(self.graph.pos[self.cwp][0],
-                          self.graph.pos[self.cwp][1], 'o',
-                          markerfacecolor=_CWP_COLOR,
-                          markeredgecolor='k',
-                          alpha=0.7,
-                          markersize=20))
+        plt.plot(self.model.x[:,0], self.model.x[:,1], 'o',
+                 markerfacecolor=_VT_COLOR,
+                 markeredgecolor=_VT_COLOR,
+                 alpha=0.5,
+                 markersize=3)
+        plt.plot(self.graph.pos[self.cwp][0],
+                 self.graph.pos[self.cwp][1], 'o',
+                 markerfacecolor=_CWP_COLOR,
+                 markeredgecolor='k',
+                 alpha=0.7,
+                 markersize=20)
         plt.draw()
+
+_KEY_Q = 113
+class Recorder(object):
+    def __init__(self, base):
+        self.base = copy.deepcopy(base)
+        self.active = []
+        self.path = []
+
+    @classmethod
+    def from_file(cls, filepath):
+        with open(filepath, 'r') as f:
+            return pickle.load(f)
+
+    def record(self, obj):
+        self.path.append(obj.path)
+        self.active.append(obj.graph.active)
+
+    def end(self, obj):
+        self.x = obj.model.x
+        self.y = obj.model.y
+
+    def plot(self, t):
+        self.base.cwp = self.path[t][0]
+        self.base.path = self.path[t]
+        self.base.model.clear()
+        self.base.model.add(self.x[:(self.base.spe-1)*t, :],
+                            self.y[:(self.base.spe-1)*t])
+        self.base.classify()
+        self.base.graph.active = self.active[t]
+        self.base.plot()
+
+    def replay(self):
+        plt.ion()
+        t = 0
+        win = curses.initscr()
+        self.win = win
+        win.keypad(1)
+        win.clear()
+        self.plot(t)
+        while True:
+            newt = t
+            s = win.getch()
+            if s == _KEY_Q:
+                curses.endwin()
+                return
+            elif s == curses.KEY_RIGHT:
+                newt = min(len(self.path)-1, t+1)
+            elif s == curses.KEY_LEFT:
+                newt = max(0, t-1)
+            if newt != t:
+                t = newt
+                self.plot(t)
+
+    def save(self, fpath):
+        if not fpath:
+            fpath = 'log'
+        with open(fpath, 'w') as f:
+            pickle.dump(self, f)

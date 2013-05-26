@@ -1,6 +1,9 @@
 #! /usr/bin/env python
 
+import util
 import plan
 
-p = plan.test()
-p.run(4)
+
+tc = util.test2()
+p = plan.Planner(tc)
+p.run(3, record=True)

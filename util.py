@@ -136,6 +136,7 @@ class Testcase(object):
 class Graph(nx.DiGraph):
     def __init__(self, x1, x2, fclass=None):
         super(Graph, self).__init__()
+        self.xres = x1.shape[0]
         self.yres = x1.shape[1]
         self.fclass = fclass
         n = 2*x1.size - 2*self.yres
