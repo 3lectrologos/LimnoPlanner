@@ -242,6 +242,7 @@ class Recorder(object):
         self.base = copy.deepcopy(base)
         self.active = []
         self.path = []
+        self.hl = []
 
     @classmethod
     def from_file(cls, filepath):
@@ -251,6 +252,7 @@ class Recorder(object):
     def record(self, obj):
         self.path.append(obj.path)
         self.active.append(obj.graph.active)
+        self.hl.append((obj.ht, obj.lt))
 
     def end(self, obj):
         self.x = obj.model.x
@@ -262,7 +264,10 @@ class Recorder(object):
         self.base.model.clear()
         self.base.model.add(self.x[:(self.base.spe-1)*t, :],
                             self.y[:(self.base.spe-1)*t])
-        self.base.classify()
+        self.base.ht, self.base.lt = self.hl[t]
+        # Alternatively (e.g. for post-highres grid) recompute
+        # filled contours at each step (slower!)
+        # self.base.classify()
         self.base.graph.active = self.active[t]
         self.base.plot()
 
