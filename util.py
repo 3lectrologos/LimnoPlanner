@@ -24,11 +24,6 @@ def test():
     tc = Testcase(k, fun=misc.funs.rosenbrock, h=-10.0)
     return tc
 
-def test2():
-    fn = '/home/alkis/gp/testcases/tc/tc_limnolog-00110714-135138_bgape_gp.mat'
-    tc = Testcase.from_mat(fn)
-    return tc
-
 def graph():
     g = Graph.from_testcase(test2())
     return g
