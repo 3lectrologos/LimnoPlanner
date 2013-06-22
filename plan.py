@@ -216,9 +216,12 @@ class Planner(object):
         cmap = plt.cm.get_cmap('gray')
         cmap.set_under(_LT_COLOR)
         cmap.set_over(_UT_COLOR)
-        plt.contourf(np.asarray(self.gx1), np.asarray(self.gx2),
-                     np.asarray(y), cmap=cmap, extend='both',
-                     levels=[-0.0001, 0])
+        cnt = plt.contourf(np.asarray(self.gx1), np.asarray(self.gx2),
+                     np.asarray(y), cmap=cmap, extend='both', 
+                     levels=[-0.0001, 0.])
+        # somehow required for colors of the levels:
+        # (see: http://stackoverflow.com/questions/11386054/python-matplotlib-change-default-color-for-values-exceeding-colorbar-range)
+        cnt.set_clim([-0.0001, 0.])
         edgelist = zip(self.path[:-1], self.path[1:])
         nx.draw_networkx_edges(self.graph, self.graph.pos, edgelist=edgelist,
                                arrows=False, edge_color=_PATH_COLOR,
